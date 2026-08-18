@@ -1,16 +1,17 @@
 'use strict';
 
 /* ==========================================================================
-   KARAOKE CHALLENGE - main.js
+   KARAOKE CHALLENGE — main.js
    ========================================================================== */
 
 /* ---------------------------------------------------------------------- */
-/* 1. ESTADO GLOBAL                                                       */
+/* 1. ESTADO GLOBAL                                                        */
 /* ---------------------------------------------------------------------- */
 
 const state = {
   songs: [],
   currentSong: null,
+
   lyrics: [],
   currentLineIndex: -1,
 
@@ -23,32 +24,38 @@ const state = {
   mediaRecorder: null,
   recordedChunks: [],
   isRecording: false,
-  recordingObjectUrl: null
+
+  recordingObjectUrl: null,
+
+  // FFmpeg
+  ffmpeg: null,
+  ffmpegLoading: false,
+  ffmpegLoaded: false
 };
 
 const FADE_OUT_SECONDS = 5;
 
 /* ---------------------------------------------------------------------- */
-/* 2. REFERENCIAS DOM                                                     */
+/* 2. REFERENCIAS DOM                                                      */
 /* ---------------------------------------------------------------------- */
 
 const dom = {
-  /* Screens */
+  // Screens
   screenMenu: document.getElementById('screen-menu'),
   screenSongs: document.getElementById('screen-songs'),
   screenKaraoke: document.getElementById('screen-karaoke'),
 
-  /* Menu */
+  // Menu
   btnPlay: document.getElementById('btnPlay'),
   btnHowTo: document.getElementById('btnHowTo'),
   btnCredits: document.getElementById('btnCredits'),
 
-  /* Songs */
+  // Songs
   btnBackFromSongs: document.getElementById('btnBackFromSongs'),
   songsList: document.getElementById('songsList'),
   songsEmpty: document.getElementById('songsEmpty'),
 
-  /* Karaoke */
+  // Karaoke
   btnBackFromKaraoke: document.getElementById('btnBackFromKaraoke'),
   karaokeBg: document.getElementById('karaokeBg'),
   karaokeCover: document.getElementById('karaokeCover'),
@@ -56,7 +63,7 @@ const dom = {
   karaokeArtist: document.getElementById('karaokeArtist'),
   lyricsScroll: document.getElementById('lyricsScroll'),
 
-  /* Audio */
+  // Audio
   audioPlayer: document.getElementById('audioPlayer'),
   timeCurrent: document.getElementById('timeCurrent'),
   timeDuration: document.getElementById('timeDuration'),
@@ -64,26 +71,26 @@ const dom = {
   progressFill: document.getElementById('progressFill'),
   progressHandle: document.getElementById('progressHandle'),
 
-  /* Playback */
+  // Controls
   btnRewind: document.getElementById('btnRewind'),
   btnPlayPause: document.getElementById('btnPlayPause'),
   btnForward: document.getElementById('btnForward'),
   iconPlay: document.getElementById('iconPlay'),
   iconPause: document.getElementById('iconPause'),
 
-  /* Recording */
+  // Recording
   btnRecord: document.getElementById('btnRecord'),
   recordLabel: document.getElementById('recordLabel'),
   btnDownload: document.getElementById('btnDownload'),
   recordStatus: document.getElementById('recordStatus'),
 
-  /* Modals */
+  // Modals
   modalHowTo: document.getElementById('modalHowTo'),
   modalCredits: document.getElementById('modalCredits')
 };
 
 /* ---------------------------------------------------------------------- */
-/* 3. NAVEGACIÓN                                                          */
+/* 3. NAVEGACIÓN                                                           */
 /* ---------------------------------------------------------------------- */
 
 function showScreen(screenEl) {
@@ -113,7 +120,7 @@ function goToKaraoke() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 4. MODALES                                                              */
+/* 4. MODALES                                                               */
 /* ---------------------------------------------------------------------- */
 
 function openModal(modalEl) {
@@ -136,7 +143,7 @@ function closeAllModals() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 5. CARGA DE SONGS.JSON                                                  */
+/* 5. SONGS.JSON                                                            */
 /* ---------------------------------------------------------------------- */
 
 async function loadSongs() {
@@ -146,22 +153,32 @@ async function loadSongs() {
     });
 
     if (!response.ok) {
-      throw new Error(`No se pudo cargar songs.json (${response.status})`);
+      throw new Error(
+        `No se pudo cargar songs.json (${response.status})`
+      );
     }
 
     const data = await response.json();
 
     if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('songs.json vacío o inválido');
+      throw new Error(
+        'songs.json vacío o inválido'
+      );
     }
 
     state.songs = data;
 
     renderSongCards(data);
 
-    console.log('[Karaoke] Canciones cargadas:', data.length);
+    console.log(
+      '[Karaoke] Canciones cargadas:',
+      data.length
+    );
   } catch (err) {
-    console.error('[Karaoke] Error cargando songs.json:', err);
+    console.error(
+      '[Karaoke] Error cargando songs.json:',
+      err
+    );
 
     if (dom.songsEmpty) {
       dom.songsEmpty.hidden = false;
@@ -175,51 +192,77 @@ function renderSongCards(songs) {
   dom.songsList.innerHTML = '';
 
   songs.forEach((song, index) => {
-    const card = document.createElement('article');
+    const card =
+      document.createElement('article');
 
     card.className = 'song-card';
-    card.style.animationDelay = `${index * 70}ms`;
+
+    card.style.animationDelay =
+      `${index * 70}ms`;
 
     const coverPath =
       `songs/${song.folder}/${song.cover}`;
 
-    const cover = document.createElement('img');
+    const cover =
+      document.createElement('img');
 
-    cover.className = 'song-cover';
-    cover.alt = `Carátula de ${song.title || 'canción'}`;
+    cover.className =
+      'song-cover';
+
+    cover.alt =
+      `Carátula de ${song.title || 'canción'}`;
+
     cover.loading = 'lazy';
+
     cover.src = coverPath;
 
     cover.onerror = () => {
       cover.onerror = null;
-      cover.src = buildFallbackCoverDataUri();
+      cover.src =
+        buildFallbackCoverDataUri();
     };
 
-    const info = document.createElement('div');
+    const info =
+      document.createElement('div');
 
     info.className = 'song-info';
-    info.innerHTML = '<h3></h3><p></p>';
 
-    const title = info.querySelector('h3');
-    const artist = info.querySelector('p');
+    info.innerHTML =
+      '<h3></h3><p></p>';
+
+    const title =
+      info.querySelector('h3');
+
+    const artist =
+      info.querySelector('p');
 
     if (title) {
-      title.textContent = song.title || 'Título desconocido';
+      title.textContent =
+        song.title ||
+        'Título desconocido';
     }
 
     if (artist) {
-      artist.textContent = song.artist || 'Artista desconocido';
+      artist.textContent =
+        song.artist ||
+        'Artista desconocido';
     }
 
-    const playBtn = document.createElement('button');
+    const playBtn =
+      document.createElement('button');
 
     playBtn.type = 'button';
-    playBtn.className = 'song-play-btn';
-    playBtn.textContent = 'Jugar';
 
-    playBtn.addEventListener('click', () => {
-      startKaraoke(song);
-    });
+    playBtn.className =
+      'song-play-btn';
+
+    playBtn.textContent =
+      'Jugar';
+
+    playBtn.addEventListener(
+      'click',
+      () => startKaraoke(song)
+    );
 
     card.appendChild(cover);
     card.appendChild(info);
@@ -230,7 +273,7 @@ function renderSongCards(songs) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 6. FALLBACK DE CARÁTULA                                                */
+/* 6. FALLBACK COVER                                                        */
 /* ---------------------------------------------------------------------- */
 
 function buildFallbackCoverDataUri() {
@@ -249,34 +292,34 @@ function buildFallbackCoverDataUri() {
     </svg>
   `;
 
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  return (
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(svg)
+  );
 }
 
 /* ---------------------------------------------------------------------- */
-/* 7. PARSER LRC                                                          */
+/* 7. PARSER LRC                                                           */
 /* ---------------------------------------------------------------------- */
-
-/*
-  Formatos aceptados:
-
-  [00:01]Texto
-  [00:01.1]Texto
-  [00:01.10]Texto
-  [00:01.100]Texto
-  [00:01:10]Texto
-  [00:01:100]Texto
-
-  También admite varias marcas en una misma línea:
-
-  [00:01.00][00:05.50]Texto
-*/
 
 function parseLRC(raw) {
   if (!raw) {
     return [];
   }
 
-  const lines = raw.split(/\r?\n/);
+  const lines =
+    raw.split(/\r?\n/);
+
+  /*
+    Admite:
+
+    [00:01]
+    [00:01.1]
+    [00:01.10]
+    [00:01.100]
+    [00:01:10]
+    [00:01:100]
+  */
 
   const timeTag =
     /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
@@ -288,24 +331,22 @@ function parseLRC(raw) {
       return;
     }
 
-    const tags = [...line.matchAll(timeTag)];
+    const tags =
+      [...line.matchAll(timeTag)];
 
-    /*
-      Si no hay timestamps, probablemente sea un metadato:
-      [ar:Artista]
-      [ti:Título]
-      [al:Álbum]
-      etc.
-    */
     if (tags.length === 0) {
       return;
     }
 
-    const text = line.replace(timeTag, '').trim();
+    const text =
+      line.replace(timeTag, '').trim();
 
     tags.forEach((match) => {
-      const minutes = parseInt(match[1], 10) || 0;
-      const seconds = parseInt(match[2], 10) || 0;
+      const minutes =
+        parseInt(match[1], 10) || 0;
+
+      const seconds =
+        parseInt(match[2], 10) || 0;
 
       let fraction = 0;
 
@@ -313,127 +354,109 @@ function parseLRC(raw) {
         const digits = match[3];
 
         if (digits.length === 1) {
-          fraction = parseInt(digits, 10) / 10;
+          fraction =
+            parseInt(digits, 10) / 10;
         } else if (digits.length === 2) {
-          fraction = parseInt(digits, 10) / 100;
+          fraction =
+            parseInt(digits, 10) / 100;
         } else {
-          fraction = parseInt(digits, 10) / 1000;
+          fraction =
+            parseInt(digits, 10) / 1000;
         }
       }
 
-      const totalSeconds =
-        minutes * 60 +
-        seconds +
-        fraction;
-
       result.push({
-        time: totalSeconds,
+        time:
+          minutes * 60 +
+          seconds +
+          fraction,
+
         text
       });
     });
   });
 
-  result.sort((a, b) => a.time - b.time);
+  result.sort(
+    (a, b) => a.time - b.time
+  );
 
   return result;
 }
 
 /* ---------------------------------------------------------------------- */
-/* 8. CARGA DE LA LETRA                                                   */
+/* 8. CARGA DE LETRAS                                                       */
 /* ---------------------------------------------------------------------- */
 
 async function loadLyrics(song) {
   const path =
     `songs/${song.folder}/${song.lyric}`;
 
-  console.log('========================================');
-  console.log('[Karaoke] CARGANDO LETRA');
-  console.log('[Karaoke] Canción:', song.title);
-  console.log('[Karaoke] Carpeta:', song.folder);
-  console.log('[Karaoke] Archivo:', song.lyric);
-  console.log('[Karaoke] Ruta:', path);
+  console.log(
+    '[Karaoke] Cargando letra:',
+    path
+  );
 
   try {
-    const response = await fetch(path, {
-      cache: 'no-store'
-    });
+    const response =
+      await fetch(path, {
+        cache: 'no-store'
+      });
 
     console.log(
-      '[Karaoke] Estado HTTP:',
+      '[Karaoke] HTTP letra:',
       response.status
-    );
-
-    console.log(
-      '[Karaoke] Response OK:',
-      response.ok
     );
 
     if (!response.ok) {
       throw new Error(
-        `No se encontró el archivo LRC (${response.status})`
+        `LRC no encontrado (${response.status})`
       );
     }
 
-    const raw = await response.text();
+    const raw =
+      await response.text();
+
+    const parsed =
+      parseLRC(raw);
 
     console.log(
-      '[Karaoke] Longitud del LRC:',
-      raw.length
-    );
-
-    console.log(
-      '[Karaoke] Contenido LRC:',
-      raw
-    );
-
-    const parsed = parseLRC(raw);
-
-    console.log(
-      '[Karaoke] Líneas detectadas:',
+      '[Karaoke] Líneas LRC:',
       parsed.length
-    );
-
-    console.log(
-      '[Karaoke] Datos parsed:',
-      parsed
     );
 
     if (parsed.length === 0) {
       throw new Error(
-        'El LRC está vacío o no contiene timestamps válidos'
+        'LRC vacío o sin timestamps válidos'
       );
     }
-
-    console.log('[Karaoke] ✅ Letra cargada correctamente');
-    console.log('========================================');
 
     return parsed;
 
   } catch (err) {
     console.error(
-      '[Karaoke] ❌ ERROR CARGANDO LETRA:',
+      '[Karaoke] Error cargando letra:',
       err
     );
-
-    console.log('========================================');
 
     return [
       {
         time: 0,
-        text: 'Letra no disponible para esta canción.'
+        text:
+          'Letra no disponible para esta canción.'
       }
     ];
   }
 }
 
 /* ---------------------------------------------------------------------- */
-/* 9. PANTALLA DE KARAOKE                                                  */
+/* 9. INICIAR KARAOKE                                                       */
 /* ---------------------------------------------------------------------- */
 
 async function startKaraoke(song) {
   cleanupKaraokeState();
 
-  state.currentSong = song;
+  state.currentSong =
+    song;
 
   const coverPath =
     `songs/${song.folder}/${song.cover}`;
@@ -441,36 +464,45 @@ async function startKaraoke(song) {
   const audioPath =
     `songs/${song.folder}/${song.audio}`;
 
-  /* Información */
   dom.karaokeTitle.textContent =
-    song.title || 'Título desconocido';
+    song.title ||
+    'Título desconocido';
 
   dom.karaokeArtist.textContent =
-    song.artist || 'Artista desconocido';
+    song.artist ||
+    'Artista desconocido';
 
-  /* Portada */
-  dom.karaokeCover.src = coverPath;
+  dom.karaokeCover.src =
+    coverPath;
 
   dom.karaokeCover.onerror = () => {
-    dom.karaokeCover.onerror = null;
+    dom.karaokeCover.onerror =
+      null;
+
     dom.karaokeCover.src =
       buildFallbackCoverDataUri();
   };
 
-  /* Fondo */
   dom.karaokeBg.style.backgroundImage =
     `url("${coverPath}")`;
 
   resetPlayerUI();
 
-  /* Cargar letra antes de mostrar la pantalla */
-  state.lyrics = await loadLyrics(song);
+  /* Letras */
+  state.lyrics =
+    await loadLyrics(song);
 
-  renderLyrics(state.lyrics);
+  renderLyrics(
+    state.lyrics
+  );
 
   /* Audio */
-  dom.audioPlayer.src = audioPath;
-  dom.audioPlayer.volume = 1;
+  dom.audioPlayer.src =
+    audioPath;
+
+  dom.audioPlayer.volume =
+    1;
+
   dom.audioPlayer.load();
 
   dom.audioPlayer.onerror = () => {
@@ -479,83 +511,79 @@ async function startKaraoke(song) {
       audioPath
     );
 
-    if (dom.recordStatus) {
-      dom.recordStatus.textContent =
-        'No se pudo cargar el audio de esta canción.';
-    }
+    dom.recordStatus.textContent =
+      'No se pudo cargar el audio de esta canción.';
   };
 
   goToKaraoke();
 }
 
 /* ---------------------------------------------------------------------- */
-/* 10. RENDER DE LA LETRA                                                  */
+/* 10. RENDER LETRAS                                                        */
 /* ---------------------------------------------------------------------- */
 
 function renderLyrics(lyrics) {
-  if (!dom.lyricsScroll) {
-    return;
-  }
+  dom.lyricsScroll.innerHTML =
+    '';
 
-  dom.lyricsScroll.innerHTML = '';
+  state.currentLineIndex =
+    -1;
 
-  state.currentLineIndex = -1;
+  lyrics.forEach(
+    (line, index) => {
+      const p =
+        document.createElement('p');
 
-  if (!lyrics || lyrics.length === 0) {
-    const p = document.createElement('p');
+      p.className =
+        'lyric-line';
 
-    p.className = 'lyric-line';
-    p.textContent =
-      'Letra no disponible para esta canción.';
+      p.textContent =
+        line.text ||
+        '\u00A0';
 
-    dom.lyricsScroll.appendChild(p);
+      p.dataset.index =
+        String(index);
 
-    return;
-  }
-
-  lyrics.forEach((line, index) => {
-    const p = document.createElement('p');
-
-    p.className = 'lyric-line';
-
-    p.textContent =
-      line.text || '\u00A0';
-
-    p.dataset.index = String(index);
-
-    dom.lyricsScroll.appendChild(p);
-  });
+      dom.lyricsScroll.appendChild(
+        p
+      );
+    }
+  );
 }
 
 /* ---------------------------------------------------------------------- */
-/* 11. RESET DEL REPRODUCTOR                                               */
+/* 11. RESET PLAYER                                                          */
 /* ---------------------------------------------------------------------- */
 
 function resetPlayerUI() {
-  if (dom.iconPlay) {
-    dom.iconPlay.hidden = false;
-  }
+  dom.iconPlay.hidden =
+    false;
 
-  if (dom.iconPause) {
-    dom.iconPause.hidden = true;
-  }
+  dom.iconPause.hidden =
+    true;
 
   dom.btnPlayPause.setAttribute(
     'aria-label',
     'Reproducir'
   );
 
-  dom.progressFill.style.width = '0%';
+  dom.progressFill.style.width =
+    '0%';
 
-  dom.progressHandle.style.left = '0%';
+  dom.progressHandle.style.left =
+    '0%';
 
-  dom.timeCurrent.textContent = '0:00';
+  dom.timeCurrent.textContent =
+    '0:00';
 
-  dom.timeDuration.textContent = '0:00';
+  dom.timeDuration.textContent =
+    '0:00';
 
-  dom.recordStatus.textContent = '';
+  dom.recordStatus.textContent =
+    '';
 
-  dom.btnDownload.hidden = true;
+  dom.btnDownload.hidden =
+    true;
 
   dom.btnRecord.classList.remove(
     'is-recording'
@@ -564,29 +592,37 @@ function resetPlayerUI() {
   dom.recordLabel.textContent =
     'Grabar voz';
 
-  state.fadeOutTriggered = false;
+  state.fadeOutTriggered =
+    false;
 }
 
 /* ---------------------------------------------------------------------- */
-/* 12. TIEMPO                                                              */
+/* 12. TIEMPO                                                               */
 /* ---------------------------------------------------------------------- */
 
 function formatTime(seconds) {
-  if (!isFinite(seconds) || seconds < 0) {
+  if (
+    !isFinite(seconds) ||
+    seconds < 0
+  ) {
     seconds = 0;
   }
 
-  const m = Math.floor(seconds / 60);
+  const m =
+    Math.floor(seconds / 60);
 
-  const s = Math.floor(seconds % 60);
+  const s =
+    Math.floor(seconds % 60);
 
-  return `${m}:${s
-    .toString()
-    .padStart(2, '0')}`;
+  return (
+    `${m}:${s
+      .toString()
+      .padStart(2, '0')}`
+  );
 }
 
 /* ---------------------------------------------------------------------- */
-/* 13. PLAY / PAUSE                                                        */
+/* 13. PLAY / PAUSE                                                         */
 /* ---------------------------------------------------------------------- */
 
 function togglePlayPause() {
@@ -594,26 +630,28 @@ function togglePlayPause() {
     return;
   }
 
-  if (dom.audioPlayer.paused) {
-    const promise =
-      dom.audioPlayer.play();
-
-    if (promise) {
-      promise.catch((err) => {
+  if (
+    dom.audioPlayer.paused
+  ) {
+    dom.audioPlayer
+      .play()
+      .catch((err) => {
         console.error(
           '[Karaoke] No se pudo reproducir:',
           err
         );
       });
-    }
   } else {
     dom.audioPlayer.pause();
   }
 }
 
 function handlePlay() {
-  dom.iconPlay.hidden = true;
-  dom.iconPause.hidden = false;
+  dom.iconPlay.hidden =
+    true;
+
+  dom.iconPause.hidden =
+    false;
 
   dom.btnPlayPause.setAttribute(
     'aria-label',
@@ -622,8 +660,11 @@ function handlePlay() {
 }
 
 function handlePause() {
-  dom.iconPlay.hidden = false;
-  dom.iconPause.hidden = true;
+  dom.iconPlay.hidden =
+    false;
+
+  dom.iconPause.hidden =
+    true;
 
   dom.btnPlayPause.setAttribute(
     'aria-label',
@@ -631,21 +672,20 @@ function handlePause() {
   );
 }
 
-/* ---------------------------------------------------------------------- */
-/* 14. METADATOS DE AUDIO                                                  */
-/* ---------------------------------------------------------------------- */
-
 function handleLoadedMetadata() {
   dom.timeDuration.textContent =
-    formatTime(dom.audioPlayer.duration);
+    formatTime(
+      dom.audioPlayer.duration
+    );
 }
 
 /* ---------------------------------------------------------------------- */
-/* 15. TIMEUPDATE                                                          */
+/* 14. TIMEUPDATE                                                           */
 /* ---------------------------------------------------------------------- */
 
 function handleTimeUpdate() {
-  const audio = dom.audioPlayer;
+  const audio =
+    dom.audioPlayer;
 
   const duration =
     audio.duration || 0;
@@ -669,7 +709,9 @@ function handleTimeUpdate() {
       formatTime(current);
   }
 
-  updateCurrentLyricLine(current);
+  updateCurrentLyricLine(
+    current
+  );
 
   handleFadeOut(
     current,
@@ -678,11 +720,15 @@ function handleTimeUpdate() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 16. SINCRONIZACIÓN DE LETRA                                             */
+/* 15. SINCRONIZACIÓN LETRA                                                  */
 /* ---------------------------------------------------------------------- */
 
-function updateCurrentLyricLine(currentTime) {
-  if (state.lyrics.length === 0) {
+function updateCurrentLyricLine(
+  currentTime
+) {
+  if (
+    state.lyrics.length === 0
+  ) {
     return;
   }
 
@@ -694,7 +740,8 @@ function updateCurrentLyricLine(currentTime) {
     i++
   ) {
     if (
-      state.lyrics[i].time <= currentTime
+      state.lyrics[i].time <=
+      currentTime
     ) {
       newIndex = i;
     } else {
@@ -717,24 +764,26 @@ function updateCurrentLyricLine(currentTime) {
       '.lyric-line'
     );
 
-  lines.forEach((el, idx) => {
-    el.classList.remove(
-      'is-current',
-      'is-past'
-    );
-
-    if (idx < newIndex) {
-      el.classList.add(
+  lines.forEach(
+    (el, idx) => {
+      el.classList.remove(
+        'is-current',
         'is-past'
       );
-    }
 
-    if (idx === newIndex) {
-      el.classList.add(
-        'is-current'
-      );
+      if (idx < newIndex) {
+        el.classList.add(
+          'is-past'
+        );
+      }
+
+      if (idx === newIndex) {
+        el.classList.add(
+          'is-current'
+        );
+      }
     }
-  });
+  );
 
   if (newIndex >= 0) {
     scrollToCurrentLine(
@@ -744,22 +793,26 @@ function updateCurrentLyricLine(currentTime) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 17. FIN DE CANCIÓN                                                      */
+/* 16. FIN DE CANCIÓN                                                       */
 /* ---------------------------------------------------------------------- */
 
 function handleEnded() {
   handlePause();
 
-  dom.audioPlayer.volume = 1;
+  dom.audioPlayer.volume =
+    1;
 
-  state.fadeOutTriggered = false;
+  state.fadeOutTriggered =
+    false;
 }
 
 /* ---------------------------------------------------------------------- */
-/* 18. AUTO-SCROLL                                                         */
+/* 17. AUTO-SCROLL                                                           */
 /* ---------------------------------------------------------------------- */
 
-function scrollToCurrentLine(lineEl) {
+function scrollToCurrentLine(
+  lineEl
+) {
   if (!lineEl) {
     return;
   }
@@ -790,7 +843,7 @@ function scrollToCurrentLine(lineEl) {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 19. FADE OUT                                                            */
+/* 18. FADE OUT                                                             */
 /* ---------------------------------------------------------------------- */
 
 function handleFadeOut(
@@ -808,12 +861,16 @@ function handleFadeOut(
     duration - currentTime;
 
   if (
-    remaining <= FADE_OUT_SECONDS &&
+    remaining <=
+      FADE_OUT_SECONDS &&
     remaining > 0
   ) {
-    state.fadeOutTriggered = true;
+    state.fadeOutTriggered =
+      true;
 
-    runFadeOut(remaining);
+    runFadeOut(
+      remaining
+    );
   }
 }
 
@@ -862,7 +919,9 @@ function runFadeOut(
         0
       );
 
-    if (progress < 1) {
+    if (
+      progress < 1
+    ) {
       state.fadeOutRAF =
         requestAnimationFrame(
           step
@@ -877,7 +936,7 @@ function runFadeOut(
 }
 
 /* ---------------------------------------------------------------------- */
-/* 20. GRABACIÓN DE VOZ                                                    */
+/* 19. MIME DE GRABACIÓN                                                     */
 /* ---------------------------------------------------------------------- */
 
 function pickSupportedMimeType() {
@@ -905,6 +964,244 @@ function pickSupportedMimeType() {
     ) || ''
   );
 }
+
+/* ---------------------------------------------------------------------- */
+/* 20. CARGAR FFMPEG                                                         */
+/* ---------------------------------------------------------------------- */
+
+async function loadFFmpeg() {
+  if (state.ffmpegLoaded) {
+    return state.ffmpeg;
+  }
+
+  if (state.ffmpegLoading) {
+    while (state.ffmpegLoading) {
+      await new Promise(
+        (resolve) =>
+          setTimeout(resolve, 100)
+      );
+    }
+
+    if (state.ffmpegLoaded) {
+      return state.ffmpeg;
+    }
+
+    throw new Error(
+      'No se pudo cargar FFmpeg.'
+    );
+  }
+
+  state.ffmpegLoading =
+    true;
+
+  try {
+    dom.recordStatus.textContent =
+      'Preparando conversión a MP3…';
+
+    /*
+      Cargamos FFmpeg dinámicamente para no obligar
+      a toda la aplicación a cargarlo al iniciar.
+
+      @ffmpeg/ffmpeg 0.12.15
+      @ffmpeg/util   0.12.2
+    */
+
+    const ffmpegModule =
+      await import(
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js'
+      );
+
+    const utilModule =
+      await import(
+        'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js'
+      );
+
+    const {
+      FFmpeg
+    } = ffmpegModule;
+
+    const {
+      toBlobURL,
+      fetchFile
+    } = utilModule;
+
+    const ffmpeg =
+      new FFmpeg();
+
+    /*
+      Core de un solo hilo.
+      Evita depender de SharedArrayBuffer.
+    */
+
+    const baseURL =
+      'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+
+    const coreURL =
+      await toBlobURL(
+        `${baseURL}/ffmpeg-core.js`,
+        'text/javascript'
+      );
+
+    const wasmURL =
+      await toBlobURL(
+        `${baseURL}/ffmpeg-core.wasm`,
+        'application/wasm'
+      );
+
+    await ffmpeg.load({
+      coreURL,
+      wasmURL
+    });
+
+    /*
+      Guardamos también fetchFile para
+      utilizarlo en la conversión.
+    */
+
+    ffmpeg.__fetchFile =
+      fetchFile;
+
+    state.ffmpeg =
+      ffmpeg;
+
+    state.ffmpegLoaded =
+      true;
+
+    state.ffmpegLoading =
+      false;
+
+    console.log(
+      '[Karaoke] ✅ FFmpeg cargado'
+    );
+
+    return ffmpeg;
+
+  } catch (err) {
+    state.ffmpegLoading =
+      false;
+
+    console.error(
+      '[Karaoke] ❌ Error cargando FFmpeg:',
+      err
+    );
+
+    throw err;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 21. CONVERTIR WEBM/OGG A MP3                                             */
+/* ---------------------------------------------------------------------- */
+
+async function convertRecordingToMP3(
+  blob
+) {
+  const ffmpeg =
+    await loadFFmpeg();
+
+  const fetchFile =
+    ffmpeg.__fetchFile;
+
+  const inputName =
+    'karaoke-input.webm';
+
+  const outputName =
+    'karaoke-output.mp3';
+
+  try {
+    /*
+      Escribimos el WebM grabado dentro
+      del sistema virtual de FFmpeg.
+    */
+
+    await ffmpeg.writeFile(
+      inputName,
+      await fetchFile(blob)
+    );
+
+    /*
+      Conversión real a MP3.
+      libmp3lame genera el archivo MP3.
+    */
+
+    await ffmpeg.exec([
+      '-i',
+      inputName,
+
+      '-vn',
+
+      '-c:a',
+      'libmp3lame',
+
+      '-b:a',
+      '192k',
+
+      '-ar',
+      '44100',
+
+      outputName
+    ]);
+
+    const data =
+      await ffmpeg.readFile(
+        outputName
+      );
+
+    /*
+      Uint8Array -> Blob
+    */
+
+    const mp3Blob =
+      new Blob(
+        [data],
+        {
+          type: 'audio/mpeg'
+        }
+      );
+
+    /*
+      Limpiamos archivos temporales.
+    */
+
+    try {
+      await ffmpeg.deleteFile(
+        inputName
+      );
+    } catch (_) {}
+
+    try {
+      await ffmpeg.deleteFile(
+        outputName
+      );
+    } catch (_) {}
+
+    return mp3Blob;
+
+  } catch (err) {
+    console.error(
+      '[Karaoke] Error convirtiendo a MP3:',
+      err
+    );
+
+    try {
+      await ffmpeg.deleteFile(
+        inputName
+      );
+    } catch (_) {}
+
+    try {
+      await ffmpeg.deleteFile(
+        outputName
+      );
+    } catch (_) {}
+
+    throw err;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* 22. GRABACIÓN                                                            */
+/* ---------------------------------------------------------------------- */
 
 async function toggleRecording() {
   if (state.isRecording) {
@@ -942,7 +1239,9 @@ async function toggleRecording() {
       mimeType
         ? new MediaRecorder(
             stream,
-            { mimeType }
+            {
+              mimeType
+            }
           )
         : new MediaRecorder(
             stream
@@ -966,12 +1265,13 @@ async function toggleRecording() {
         }
       };
 
-    recorder.onstop = () => {
-      finalizeRecording(
-        mimeType ||
-          'audio/webm'
-      );
-    };
+    recorder.onstop =
+      async () => {
+        await finalizeRecording(
+          mimeType ||
+            'audio/webm'
+        );
+      };
 
     recorder.onerror =
       (event) => {
@@ -1008,7 +1308,7 @@ async function toggleRecording() {
 
   } catch (err) {
     console.error(
-      '[Karaoke] Permiso de micrófono denegado o error:',
+      '[Karaoke] Error de micrófono:',
       err
     );
 
@@ -1016,6 +1316,10 @@ async function toggleRecording() {
       'No se pudo acceder al micrófono. Revisa los permisos del navegador.';
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* 23. DETENER GRABACIÓN                                                     */
+/* ---------------------------------------------------------------------- */
 
 function stopRecording() {
   if (
@@ -1033,7 +1337,8 @@ function stopRecording() {
         track.stop();
       });
 
-    state.mediaStream = null;
+    state.mediaStream =
+      null;
   }
 
   state.isRecording =
@@ -1045,9 +1350,16 @@ function stopRecording() {
 
   dom.recordLabel.textContent =
     'Grabar voz';
+
+  dom.recordStatus.textContent =
+    'Procesando grabación…';
 }
 
-function finalizeRecording(
+/* ---------------------------------------------------------------------- */
+/* 24. FINALIZAR Y CREAR MP3                                                 */
+/* ---------------------------------------------------------------------- */
+
+async function finalizeRecording(
   mimeType
 ) {
   if (
@@ -1060,7 +1372,7 @@ function finalizeRecording(
     return;
   }
 
-  const blob =
+  const recordedBlob =
     new Blob(
       state.recordedChunks,
       {
@@ -1068,41 +1380,84 @@ function finalizeRecording(
       }
     );
 
-  const url =
-    URL.createObjectURL(
-      blob
+  try {
+    dom.recordStatus.textContent =
+      'Convirtiendo a MP3…';
+
+    /*
+      Convertimos el audio real.
+    */
+
+    const mp3Blob =
+      await convertRecordingToMP3(
+        recordedBlob
+      );
+
+    const url =
+      URL.createObjectURL(
+        mp3Blob
+      );
+
+    state.recordingObjectUrl =
+      url;
+
+    const songSlug =
+      state.currentSong
+        ? state.currentSong.folder
+        : 'grabacion';
+
+    dom.btnDownload.href =
+      url;
+
+    dom.btnDownload.download =
+      `mi-voz-${songSlug}.mp3`;
+
+    dom.btnDownload.hidden =
+      false;
+
+    dom.recordStatus.textContent =
+      '✅ MP3 listo. Ya puedes descargar tu grabación.';
+
+  } catch (err) {
+    console.error(
+      '[Karaoke] No se pudo crear el MP3:',
+      err
     );
 
-  state.recordingObjectUrl =
-    url;
+    /*
+      Como respaldo, ofrecemos el WebM original.
+    */
 
-  let extension = 'webm';
+    const fallbackUrl =
+      URL.createObjectURL(
+        recordedBlob
+      );
 
-  if (mimeType.includes('ogg')) {
-    extension = 'ogg';
-  } else if (
-    mimeType.includes('mp4')
-  ) {
-    extension = 'm4a';
+    state.recordingObjectUrl =
+      fallbackUrl;
+
+    const songSlug =
+      state.currentSong
+        ? state.currentSong.folder
+        : 'grabacion';
+
+    dom.btnDownload.href =
+      fallbackUrl;
+
+    dom.btnDownload.download =
+      `mi-voz-${songSlug}.webm`;
+
+    dom.btnDownload.hidden =
+      false;
+
+    dom.recordStatus.textContent =
+      'No se pudo convertir a MP3. Se ofrece la grabación original en WebM.';
   }
-
-  const songSlug =
-    state.currentSong
-      ? state.currentSong.folder
-      : 'grabacion';
-
-  dom.btnDownload.href =
-    url;
-
-  dom.btnDownload.download =
-    `mi-voz-${songSlug}.${extension}`;
-
-  dom.btnDownload.hidden =
-    false;
-
-  dom.recordStatus.textContent =
-    'Grabación lista. Ya puedes descargarla.';
 }
+
+/* ---------------------------------------------------------------------- */
+/* 25. URL DE GRABACIÓN                                                     */
+/* ---------------------------------------------------------------------- */
 
 function revokePreviousRecordingUrl() {
   if (
@@ -1118,7 +1473,7 @@ function revokePreviousRecordingUrl() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 21. LIMPIEZA                                                            */
+/* 26. LIMPIEZA                                                             */
 /* ---------------------------------------------------------------------- */
 
 function stopPlaybackAndRecording() {
@@ -1128,12 +1483,7 @@ function stopPlaybackAndRecording() {
     try {
       dom.audioPlayer.currentTime =
         0;
-    } catch (err) {
-      console.warn(
-        '[Karaoke] No se pudo resetear currentTime:',
-        err
-      );
-    }
+    } catch (_) {}
   }
 
   dom.audioPlayer.volume =
@@ -1171,7 +1521,7 @@ function cleanupKaraokeState() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 22. BARRA DE PROGRESO                                                   */
+/* 27. BARRA DE PROGRESO                                                     */
 /* ---------------------------------------------------------------------- */
 
 function seekFromClientX(
@@ -1186,7 +1536,8 @@ function seekFromClientX(
         (
           clientX -
           rect.left
-        ) / rect.width,
+        ) /
+          rect.width,
         0
       ),
       1
@@ -1253,19 +1604,21 @@ function setupProgressBarEvents() {
   [
     'pointerup',
     'pointercancel'
-  ].forEach((evt) => {
-    dom.progressBar.addEventListener(
-      evt,
-      () => {
-        state.isScrubbing =
-          false;
-      }
-    );
-  });
+  ].forEach(
+    (evt) => {
+      dom.progressBar.addEventListener(
+        evt,
+        () => {
+          state.isScrubbing =
+            false;
+        }
+      );
+    }
+  );
 }
 
 /* ---------------------------------------------------------------------- */
-/* 23. EVENTOS                                                             */
+/* 28. EVENTOS                                                              */
 /* ---------------------------------------------------------------------- */
 
 function bindEvents() {
@@ -1307,9 +1660,7 @@ function bindEvents() {
     dom.modalHowTo,
     dom.modalCredits
   ].forEach((modal) => {
-    if (!modal) {
-      return;
-    }
+    if (!modal) return;
 
     modal.addEventListener(
       'click',
@@ -1324,13 +1675,15 @@ function bindEvents() {
   document.addEventListener(
     'keydown',
     (e) => {
-      if (e.key === 'Escape') {
+      if (
+        e.key === 'Escape'
+      ) {
         closeAllModals();
       }
     }
   );
 
-  /* Selector de canciones */
+  /* Selector */
   dom.btnBackFromSongs.addEventListener(
     'click',
     goToMenu
@@ -1368,7 +1721,7 @@ function bindEvents() {
     handleEnded
   );
 
-  /* Play/Pause */
+  /* Play / Pause */
   dom.btnPlayPause.addEventListener(
     'click',
     togglePlayPause
@@ -1415,7 +1768,7 @@ function bindEvents() {
 }
 
 /* ---------------------------------------------------------------------- */
-/* 24. INICIALIZACIÓN                                                      */
+/* 29. INICIALIZACIÓN                                                       */
 /* ---------------------------------------------------------------------- */
 
 function init() {
